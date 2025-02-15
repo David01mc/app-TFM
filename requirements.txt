@@ -1,4 +1,4 @@
-Flask
 pymongo
-werkzeug
+Flask
 gunicorn
+Werkzeug

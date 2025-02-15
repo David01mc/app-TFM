@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .chat-box {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 20px;
+            margin: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .bot-message {
+            background-color: #ffffff;
+            align-self: flex-start;
+            text-align: left;
+            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-container {
+            display: flex;
+            padding: 15px;
+            background: #fff;
+            border-top: 1px solid #ddd;
+        }
+
+        #user-input {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            font-size: 1rem;
+        }
+
+        button {
+            margin-left: 10px;
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .news-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .news-item {
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #eee;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .news-item:hover {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">Chat - Bienvenido, {{ username }}!</div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Escribe un tema para buscar noticias..." required>
+            <button onclick="searchNews()">Buscar</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedNewsId = null;
+        let isAskingQuestion = false; // Flag para diferenciar búsqueda de preguntas
+    
+        function searchNews() {
+            const userInput = document.getElementById('user-input').value.trim();
+            if (!userInput || isAskingQuestion) return; // Evita buscar si ya está en modo preguntas
+    
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML += `<div class="message user-message">🔍 Buscando noticias sobre: "${userInput}"</div>`;
+    
+            fetch('/search_news', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                chatBox.innerHTML += `<div class="message bot-message">📢 Selecciona una de las noticias relevantes:</div>`;
+                const newsSelection = document.createElement('div');
+                newsSelection.className = 'news-selection';
+    
+                data.results.forEach((news, index) => {
+                    const titulo = news.titulo ? news.titulo : "Sin título disponible";
+                    const url = news.url ? news.url : "#";
+    
+                    const newsItem = document.createElement('div');
+                    newsItem.className = 'news-item';
+                    newsItem.innerHTML = `<strong>${index + 1}. <a href="${url}" target="_blank">${titulo}</a></strong>`;
+                    newsItem.onclick = () => selectNews(news.id);
+                    newsSelection.appendChild(newsItem);
+                });
+    
+                chatBox.appendChild(newsSelection);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(error => {
+                console.error("Error al obtener noticias:", error);
+                chatBox.innerHTML += `<div class="message bot-message">⚠️ Error al buscar noticias. Inténtalo de nuevo.</div>`;
+            });
+    
+            document.getElementById('user-input').value = '';
+    
+            // Cambiar evento para solo hacer búsquedas al presionar Enter
+            document.getElementById('user-input').removeEventListener("keydown", askQuestion);
+            document.getElementById('user-input').addEventListener("keydown", function(event) {
+                if (event.key === "Enter") {
+                    searchNews();
+                }
+            });
+    
+            // Asegurar que el botón "Buscar" esté asignado a búsqueda
+            document.getElementById('search-button').onclick = searchNews;
+        }
+    
+        function selectNews(newsId) {
+            selectedNewsId = newsId;
+            isAskingQuestion = true; // Cambia el estado a modo pregunta
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML += `<div class="message bot-message">✅ Noticia seleccionada. Ahora puedes hacer preguntas.</div>`;
+    
+            // Cambiar la funcionalidad del input para preguntar sobre la noticia
+            document.getElementById('user-input').placeholder = "Pregunta sobre la noticia...";
+            document.getElementById('user-input').value = "";
+    
+            // Eliminar evento previo de búsqueda y asignar nuevo evento para preguntar
+            document.getElementById('user-input').removeEventListener("keydown", searchNews);
+            document.getElementById('user-input').addEventListener("keydown", function(event) {
+                if (event.key === "Enter") {
+                    askQuestion();
+                }
+            });
+    
+            // Cambiar el botón "Buscar" para hacer preguntas en lugar de buscar noticias
+            document.getElementById('search-button').onclick = askQuestion;
+        }
+    
+        function askQuestion() {
+            const userInput = document.getElementById('user-input').value.trim();
+            if (!userInput || !selectedNewsId) return;
+    
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML += `<div class="message user-message">${userInput}</div>`;
+    
+            fetch('/ask_news', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ news_id: selectedNewsId, question: userInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                chatBox.innerHTML += `<div class="message bot-message">${data.response}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(error => {
+                console.error("Error al obtener respuesta:", error);
+                chatBox.innerHTML += `<div class="message bot-message">⚠️ Error al procesar la pregunta.</div>`;
+            });
+    
+            document.getElementById('user-input').value = '';
+        }
+    </script>
+    
+
+</body>
+</html>

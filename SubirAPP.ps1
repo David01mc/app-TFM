@@ -1,0 +1,1 @@
+az webapp up --name testTFMAPP --resource-group TFM-OpenAI --runtime "PYTHON:3.9" --sku f1 --logs 
